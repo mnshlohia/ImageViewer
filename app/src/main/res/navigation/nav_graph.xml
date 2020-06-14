@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/imageListingFragment">
+
+    <fragment
+        android:id="@+id/imageListingFragment"
+        android:name="com.example.imageviewer.ui.fragments.ImageListingFragment"
+        android:label="ImageListingFragment"
+        tools:layout="@layout/image_listing_layout">
+        <action
+            android:id="@+id/action_imageListingFragment_to_imageViewFragment"
+            app:destination="@id/imageViewFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/imageViewFragment"
+        android:name="com.example.imageviewer.ui.fragments.ImageViewFragment"
+        android:label="ImageViewFragment"
+        tools:layout="@layout/image_view_layout">
+
+        <argument
+            android:name="imageUrl"
+            android:defaultValue=""
+            app:argType="string" />
+
+    </fragment>
+</navigation>
