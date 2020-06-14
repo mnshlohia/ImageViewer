@@ -14,9 +14,8 @@ import java.util.concurrent.Executors
 class ImageLoader private constructor(context: Context) {
 
     private var diskLru: DiskLruImageCache
-   /* private val maxCacheSize: Int = (Runtime.getRuntime().maxMemory() / 1024).toInt() / 8
-    private val memoryCache: LruCache<String, Bitmap>*/
-    private var memoryLruCache:MemoryLruCache
+
+    private var  memoryLruCache:MemoryLruCache
 
     private var mCompressFormat = Bitmap.CompressFormat.JPEG
     private var mCompressQuality = 70
@@ -111,6 +110,33 @@ class ImageLoader private constructor(context: Context) {
         }
     }
 
+    fun load(imageUrl: String?, imageView: ImageView?,callback:(result: String?) -> Unit) {
+
+        require(imageView != null) {
+            "ImageLoader:load - ImageView should not be null."
+        }
+
+        require(imageUrl != null && imageUrl.isNotEmpty()) {
+            "ImageLoader:load - Image Url should not be empty"
+        }
+
+        imageViewMap[imageView] = imageUrl
+
+        var bitmap = checkImageInCache(imageUrl)
+
+        bitmap?.let {
+            loadImageIntoImageView(imageView, it, imageUrl,callback)
+        } ?: run {
+            if (diskLru.containsKey(imageUrl))
+                bitmap = diskLru.getBitmap(imageUrl)
+            bitmap?.let {
+                loadImageIntoImageView(imageView, it, imageUrl,callback)
+            } ?: run {
+                executorService.submit(PhotosLoaderCallback(ImageRequest(imageUrl, imageView),callback))
+            }
+        }
+    }
+
     @Synchronized
     private fun loadImageIntoImageView(imageView: ImageView, bitmap: Bitmap?, imageUrl: String) {
 
@@ -125,6 +151,30 @@ class ImageLoader private constructor(context: Context) {
                 scaledBitmap
             )
         }
+    }
+
+
+    @Synchronized
+    private fun loadImageIntoImageView(
+        imageView: ImageView, bitmap: Bitmap?, imageUrl: String,
+        callback: (result: String?) -> Unit
+    ) {
+
+        require(bitmap != null) {
+            "ImageLoader:loadImageIntoImageView - Bitmap should not be null"
+        }
+
+        val scaledBitmap = Utils.scaleBitmapForLoad(bitmap, imageView.width, imageView.height)
+
+        scaledBitmap?.let {
+            if (!isImageViewReused(ImageRequest(imageUrl, imageView))) imageView.setImageBitmap(
+                scaledBitmap
+            )
+            callback.invoke("success")
+        }?:run{
+            callback.invoke("failure")
+        }
+
     }
 
 
@@ -143,6 +193,19 @@ class ImageLoader private constructor(context: Context) {
                 imageRequest.imageView,
                 checkImageInCache(imageRequest.imgUrl),
                 imageRequest.imgUrl
+            )
+        }
+    }
+
+    inner class DisplayBitmapCallback(
+        private var imageRequest: ImageRequest,
+        private var callback: (result: String?) -> Unit
+    ) : Runnable {
+        override fun run() {
+            if (!isImageViewReused(imageRequest)) loadImageIntoImageView(
+                imageRequest.imageView,
+                checkImageInCache(imageRequest.imgUrl),
+                imageRequest.imgUrl,callback
             )
         }
     }
@@ -166,6 +229,31 @@ class ImageLoader private constructor(context: Context) {
             if (isImageViewReused(imageRequest)) return
 
             val displayBitmap = DisplayBitmap(imageRequest)
+            handler.post(displayBitmap)
+        }
+    }
+
+
+    inner class PhotosLoaderCallback(
+        private var imageRequest: ImageRequest,
+        private var callback: (result: String?) -> Unit
+    ) : Runnable {
+
+        override fun run() {
+
+            if (isImageViewReused(imageRequest)) return
+
+
+            val bitmap = Utils.downloadBitmapFromURL(imageRequest.imgUrl)
+            //put bitmap in memory cache
+            memoryLruCache.put(imageRequest.imgUrl, bitmap)
+
+            //put bitmap in disk cache
+            diskLru.put(imageRequest.imgUrl,bitmap)
+
+            if (isImageViewReused(imageRequest)) return
+
+            val displayBitmap = DisplayBitmapCallback(imageRequest,callback)
             handler.post(displayBitmap)
         }
     }

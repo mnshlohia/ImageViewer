@@ -1,10 +1,14 @@
 package com.example.imageviewer.ui.fragments
 
+import android.app.Activity
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.appcompat.widget.Toolbar
+import androidx.navigation.NavController
+import androidx.navigation.Navigation
 import com.example.imageloader.ImageLoader
 import com.example.imageviewer.R
 import com.example.imageviewer.databinding.ImageViewLayoutBinding
@@ -14,7 +18,7 @@ import kotlinx.coroutines.*
 
 class ImageViewFragment :DaggerFragment() {
 
-    private var image_url: String? = null
+    private var imageUrl: String? = null
     lateinit var binding: ImageViewLayoutBinding
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -23,7 +27,7 @@ class ImageViewFragment :DaggerFragment() {
     ): View? {
         binding=ImageViewLayoutBinding.inflate(inflater)
         hideToolbar()
-        image_url=arguments?.getString("imageUrl")
+        imageUrl=arguments?.getString("imageUrl")
         return binding.root
     }
 
@@ -33,35 +37,29 @@ class ImageViewFragment :DaggerFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 
-        setImageUrlEncoding(image_url)
-        binding.progressCircular.visibility=View.VISIBLE
-      CoroutineScope(Dispatchers.Default).launch {
-            val result=async {ImageLoader.with(context).load(image_url,binding.view)  }
-          result.await()
-          withContext(Dispatchers.Main){
-              binding.progressCircular.visibility=View.GONE
-          }
-      }
-
-
-
-
-
-
+        setImageUrlEncoding()
+        ImageLoader.with(context).load(imageUrl,binding.view){
+            if(it=="success"){
+                binding.progressCircular.visibility=View.GONE
+            }else{
+                binding.progressCircular.visibility=View.GONE
+                Navigation.findNavController(context as Activity,R.id.nav_host_fragment_container).navigateUp()
+            }
+        }
     }
 
-    private fun setImageUrlEncoding(imageUrl: String?) {
-        if(image_url!!.contains("&amp;auto")){
-            image_url=image_url?.replace("&amp;auto","&auto")
+    private fun setImageUrlEncoding() {
+        if(imageUrl!!.contains("&amp;auto")){
+            imageUrl=imageUrl?.replace("&amp;auto","&auto")
         }
-        if(image_url!!.contains("&amp;s")){
-            image_url=image_url?.replace("&amp;s","&s")
+        if(imageUrl!!.contains("&amp;s")){
+            imageUrl=imageUrl?.replace("&amp;s","&s")
         }
-        if(image_url!!.contains("&amp;crop")){
-            image_url=image_url?.replace("&amp;crop","&crop")
+        if(imageUrl!!.contains("&amp;crop")){
+            imageUrl=imageUrl?.replace("&amp;crop","&crop")
         }
-        if(image_url!!.contains("&amp;format")){
-            image_url=image_url?.replace("&amp;format","&format")
+        if(imageUrl!!.contains("&amp;format")){
+            imageUrl=imageUrl?.replace("&amp;format","&format")
         }
     }
 }
